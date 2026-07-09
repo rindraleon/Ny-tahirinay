@@ -127,9 +127,9 @@ class NotificationService {
       corps,
       prochaine,
       details,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absolute,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
       matchDateTimeComponents: DateTimeComponents.dayOfMonthAndTime,
     );
   }
