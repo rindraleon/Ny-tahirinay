@@ -1,0 +1,36 @@
+# Git attributes for line endings configuration
+# This file ensures consistent line endings across different platforms
+
+# Set default behavior to automatically normalize line endings
+* text=auto
+
+# Source code files - use LF (Unix-style) line endings
+*.dart text eol=lf
+*.kt text eol=lf
+*.java text eol=lf
+*.xml text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+
+# Gradle files
+*.gradle text eol=lf
+*.properties text eol=lf
+
+# Shell scripts
+*.sh text eol=lf
+*.bat text eol=crlf
+
+# Binary files - do not modify
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.jar binary
+
+# Lock files
+*.lock text eol=lf
