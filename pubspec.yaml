@@ -1,0 +1,64 @@
+name: cotisation_app
+description: "Application de gestion des cotisations pour association"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.5.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # Base de données locale
+  sqflite: ^2.3.3+1
+  path: ^1.9.0
+  path_provider: ^2.1.4
+
+  # Gestion d'état
+  provider: ^6.1.2
+
+  # Formatage nombres / dates
+  intl: ^0.19.0
+
+  # Export PDF
+  pdf: ^3.11.1
+  printing: ^5.13.3
+
+  # Export Excel
+  excel: ^4.0.6
+
+  # Partage de fichiers
+  share_plus: ^10.0.2
+
+  # Graphiques
+  fl_chart: ^0.69.0
+
+  # Sélecteur de fichiers pour import/export sauvegarde
+  file_picker: ^8.1.2
+
+  # Notifications locales
+  flutter_local_notifications: ^18.0.1
+  permission_handler: ^11.3.1
+  timezone: ^0.9.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.14.1
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/icon/app_icon.png
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon/app_icon.png"
+  adaptive_icon_background: "#1565C0"
+  adaptive_icon_foreground: "assets/icon/app_icon.png"
