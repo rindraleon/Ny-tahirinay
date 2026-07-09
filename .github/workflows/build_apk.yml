@@ -36,6 +36,9 @@ jobs:
       - name: Vérifier l'installation de Flutter
         run: flutter doctor -v
 
+      - name: Rendre le script gradlew exécutable
+        run: chmod +x android/gradlew
+
       - name: Installer les dépendances
         run: flutter pub get
 
