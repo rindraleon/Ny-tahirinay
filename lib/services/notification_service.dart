@@ -5,14 +5,7 @@ import 'package:timezone/data/latest.dart' as tzdata;
 import '../db/database_helper.dart';
 import '../utils/formatters.dart';
 
-/// Service centralisant la gestion des notifications locales :
-/// - Rappel de début de mois pour lancer la collecte des cotisations
-/// - Alerte listant les membres en retard (envoyée le 15 et le 25 du mois)
-///
-/// Toutes les méthodes de ce service sont volontairement "silencieuses"
-/// en cas d'erreur (permission refusée, fonctionnalité indisponible sur
-/// l'appareil, etc.) : une notification qui échoue à se planifier ne doit
-/// jamais empêcher le reste de l'application de fonctionner.
+
 class NotificationService {
   NotificationService._privateConstructor();
   static final NotificationService instance =
@@ -40,9 +33,7 @@ class NotificationService {
       return;
     }
 
-    // Demande de permission (Android 13+). Si l'utilisateur refuse ou que
-    // l'appareil ne supporte pas cette API, on continue sans planifier
-    // les rappels automatiques plutôt que de faire planter l'application.
+    
     try {
       await _plugin
           .resolvePlatformSpecificImplementation<
