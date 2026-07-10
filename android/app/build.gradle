@@ -13,6 +13,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
+        // Requis par le plugin flutter_local_notifications (utilise des API Java 8+)
+        coreLibraryDesugaringEnabled true
     }
 
     kotlinOptions {
@@ -41,4 +43,9 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Requis par le plugin flutter_local_notifications (core library desugaring)
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
 }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tzdata;
@@ -7,6 +8,11 @@ import '../utils/formatters.dart';
 /// Service centralisant la gestion des notifications locales :
 /// - Rappel de début de mois pour lancer la collecte des cotisations
 /// - Alerte listant les membres en retard (envoyée le 15 et le 25 du mois)
+///
+/// Toutes les méthodes de ce service sont volontairement "silencieuses"
+/// en cas d'erreur (permission refusée, fonctionnalité indisponible sur
+/// l'appareil, etc.) : une notification qui échoue à se planifier ne doit
+/// jamais empêcher le reste de l'application de fonctionner.
 class NotificationService {
   NotificationService._privateConstructor();
   static final NotificationService instance =
@@ -20,28 +26,46 @@ class NotificationService {
   Future<void> initialiser() async {
     if (_initialise) return;
 
-    tzdata.initializeTimeZones();
+    try {
+      tzdata.initializeTimeZones();
 
-    const androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-    const initSettings = InitializationSettings(android: androidSettings);
+      const androidSettings =
+          AndroidInitializationSettings('@mipmap/ic_launcher');
+      const initSettings = InitializationSettings(android: androidSettings);
 
-    await _plugin.initialize(initSettings);
+      await _plugin.initialize(initSettings);
+      _initialise = true;
+    } catch (e) {
+      debugPrint('NotificationService: échec de l\'initialisation de base : $e');
+      return;
+    }
 
-    // Demande de permission (Android 13+)
-    await _plugin
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.requestNotificationsPermission();
+    // Demande de permission (Android 13+). Si l'utilisateur refuse ou que
+    // l'appareil ne supporte pas cette API, on continue sans planifier
+    // les rappels automatiques plutôt que de faire planter l'application.
+    try {
+      await _plugin
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>()
+          ?.requestNotificationsPermission();
+    } catch (e) {
+      debugPrint('NotificationService: permission notifications refusée/indisponible : $e');
+    }
 
-    await _plugin
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.requestExactAlarmsPermission();
+    try {
+      await _plugin
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>()
+          ?.requestExactAlarmsPermission();
+    } catch (e) {
+      debugPrint('NotificationService: permission alarmes exactes refusée/indisponible : $e');
+    }
 
-    _initialise = true;
-
-    await _planifierRappelsRecurrents();
+    try {
+      await _planifierRappelsRecurrents();
+    } catch (e) {
+      debugPrint('NotificationService: échec de la planification des rappels : $e');
+    }
   }
 
   Future<void> _planifierRappelsRecurrents() async {
@@ -90,86 +114,139 @@ class NotificationService {
     required String titre,
     required String corps,
   }) async {
-    final maintenant = tz.TZDateTime.now(tz.local);
-    var prochaine = tz.TZDateTime(
-      tz.local,
-      maintenant.year,
-      maintenant.month,
-      jour,
-      heure,
-    );
-
-    if (prochaine.isBefore(maintenant)) {
-      // Passe au mois suivant si la date est déjà passée ce mois-ci
-      prochaine = tz.TZDateTime(
+    try {
+      final maintenant = tz.TZDateTime.now(tz.local);
+      var prochaine = tz.TZDateTime(
         tz.local,
-        maintenant.month == 12 ? maintenant.year + 1 : maintenant.year,
-        maintenant.month == 12 ? 1 : maintenant.month + 1,
+        maintenant.year,
+        maintenant.month,
         jour,
         heure,
       );
+
+      if (prochaine.isBefore(maintenant)) {
+        // Passe au mois suivant si la date est déjà passée ce mois-ci
+        prochaine = tz.TZDateTime(
+          tz.local,
+          maintenant.month == 12 ? maintenant.year + 1 : maintenant.year,
+          maintenant.month == 12 ? 1 : maintenant.month + 1,
+          jour,
+          heure,
+        );
+      }
+
+      const details = NotificationDetails(
+        android: AndroidNotificationDetails(
+          'ny_tahiriko_rappels',
+          'Rappels de cotisation',
+          channelDescription:
+              'Notifications de rappel pour la collecte des cotisations',
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
+      );
+
+      await _plugin.zonedSchedule(
+        id,
+        titre,
+        corps,
+        prochaine,
+        details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.dayOfMonthAndTime,
+      );
+    } catch (e) {
+      // Si la planification "exacte" échoue (permission manquante sur
+      // Android 12+ par exemple), on tente une version non exacte plutôt
+      // que d'abandonner complètement le rappel.
+      debugPrint('NotificationService: planification exacte échouée pour "$id", tentative en mode non exact : $e');
+      try {
+        final maintenant = tz.TZDateTime.now(tz.local);
+        var prochaine = tz.TZDateTime(
+          tz.local,
+          maintenant.year,
+          maintenant.month,
+          jour,
+          heure,
+        );
+        if (prochaine.isBefore(maintenant)) {
+          prochaine = tz.TZDateTime(
+            tz.local,
+            maintenant.month == 12 ? maintenant.year + 1 : maintenant.year,
+            maintenant.month == 12 ? 1 : maintenant.month + 1,
+            jour,
+            heure,
+          );
+        }
+        const details = NotificationDetails(
+          android: AndroidNotificationDetails(
+            'ny_tahiriko_rappels',
+            'Rappels de cotisation',
+            channelDescription:
+                'Notifications de rappel pour la collecte des cotisations',
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
+        );
+        await _plugin.zonedSchedule(
+          id,
+          titre,
+          corps,
+          prochaine,
+          details,
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          matchDateTimeComponents: DateTimeComponents.dayOfMonthAndTime,
+        );
+      } catch (e2) {
+        debugPrint('NotificationService: impossible de planifier le rappel "$id" : $e2');
+      }
     }
-
-    const details = NotificationDetails(
-      android: AndroidNotificationDetails(
-        'ny_tahiriko_rappels',
-        'Rappels de cotisation',
-        channelDescription:
-            'Notifications de rappel pour la collecte des cotisations',
-        importance: Importance.high,
-        priority: Priority.high,
-      ),
-    );
-
-    await _plugin.zonedSchedule(
-      id,
-      titre,
-      corps,
-      prochaine,
-      details,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.dayOfMonthAndTime,
-    );
   }
 
   /// Affiche immédiatement une notification listant les membres en retard
   /// pour le mois en cours (peut être appelée manuellement depuis l'app).
   Future<void> notifierMembresEnRetardMaintenant() async {
-    final moisActuel = Formatters.moisActuel();
-    final membresEnRetard =
-        await DatabaseHelper.instance.getMembresEnRetard(moisActuel);
+    try {
+      final moisActuel = Formatters.moisActuel();
+      final membresEnRetard =
+          await DatabaseHelper.instance.getMembresEnRetard(moisActuel);
 
-    if (membresEnRetard.isEmpty) {
+      if (membresEnRetard.isEmpty) {
+        await _plugin.show(
+          2001,
+          '✅ Tout le monde est à jour',
+          'Tous les membres actifs ont payé leur cotisation de ${Formatters.moisLisible(moisActuel)}.',
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              'ny_tahiriko_rappels',
+              'Rappels de cotisation',
+              importance: Importance.defaultImportance,
+            ),
+          ),
+        );
+        return;
+      }
+
+      final noms = membresEnRetard.map((m) => m.nom).join(', ');
       await _plugin.show(
-        2001,
-        '✅ Tout le monde est à jour',
-        'Tous les membres actifs ont payé leur cotisation de ${Formatters.moisLisible(moisActuel)}.',
+        2002,
+        '⚠️ ${membresEnRetard.length} membre(s) en retard',
+        'N\'ont pas encore payé pour ${Formatters.moisLisible(moisActuel)} : $noms',
         const NotificationDetails(
           android: AndroidNotificationDetails(
             'ny_tahiriko_rappels',
             'Rappels de cotisation',
-            importance: Importance.defaultImportance,
+            importance: Importance.high,
+            priority: Priority.high,
           ),
         ),
       );
-      return;
+    } catch (e) {
+      debugPrint('NotificationService: échec de l\'affichage de la notification de retard : $e');
     }
-
-    final noms = membresEnRetard.map((m) => m.nom).join(', ');
-    await _plugin.show(
-      2002,
-      '⚠️ ${membresEnRetard.length} membre(s) en retard',
-      'N\'ont pas encore payé pour ${Formatters.moisLisible(moisActuel)} : $noms',
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'ny_tahiriko_rappels',
-          'Rappels de cotisation',
-          importance: Importance.high,
-          priority: Priority.high,
-        ),
-      ),
-    );
   }
 }

@@ -15,8 +15,18 @@ import 'services/notification_service.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('fr_FR', null);
-  await NotificationService.instance.initialiser();
+
+  // Lance immédiatement l'interface : l'application ne doit jamais rester
+  // bloquée sur un écran blanc/noir à cause d'une initialisation secondaire.
   runApp(const CotisationApp());
+
+  // Initialise les notifications APRÈS l'affichage de l'UI, et de façon
+  // totalement non bloquante : si le téléphone refuse une permission ou si
+  // une erreur survient, l'application continue de fonctionner normalement
+  // (seuls les rappels automatiques seraient alors indisponibles).
+  NotificationService.instance.initialiser().catchError((error, stackTrace) {
+    debugPrint('Initialisation des notifications ignorée (erreur non bloquante) : $error');
+  });
 }
 
 class CotisationApp extends StatelessWidget {
@@ -106,9 +116,13 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _chargerToutesLesDonnees() async {
-    await context.read<MembreProvider>().chargerMembres();
-    await context.read<CotisationProvider>().chargerCotisations();
-    await context.read<SortieProvider>().chargerSorties();
+    try {
+      await context.read<MembreProvider>().chargerMembres();
+      await context.read<CotisationProvider>().chargerCotisations();
+      await context.read<SortieProvider>().chargerSorties();
+    } catch (e) {
+      debugPrint('Erreur lors du chargement initial des données : $e');
+    }
   }
 
   @override
