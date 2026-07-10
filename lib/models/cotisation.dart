@@ -54,10 +54,10 @@ class Cotisation {
       mois: map['mois'] as String,
       montant: (map['montant'] as num).toDouble(),
       datePaiement: map['date_paiement'] as String,
-      modePaiement: map['mode_paiement'] as String? ?? 'Espèces',
+      modePaiement: (map['mode_paiement'] as String?) ?? 'Espèces',
       typeCotisation:
-          map['type_cotisation'] as String? ?? TypeCotisation.mensuelle,
-      libelle: map['libelle'] as String? ?? '',
+          (map['type_cotisation'] as String?) ?? TypeCotisation.mensuelle,
+      libelle: (map['libelle'] as String?) ?? '',
     );
   }
 }
